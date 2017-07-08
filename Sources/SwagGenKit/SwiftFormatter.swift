@@ -82,7 +82,7 @@ public class SwiftFormatter: CodeFormatter {
 
         let enumValue = item.metadata.getEnum(name: name, description: "").flatMap { getEnumContext($0)["enumName"] as? String }
 
-        switch item {
+        switch item.type {
         case let .array(item): return "[\(enumValue ?? getItemType(name: name, item: item.items))]"
         case .boolean: return "Bool"
         case let .integer(item): return enumValue ?? "Int"
@@ -118,9 +118,9 @@ public class SwiftFormatter: CodeFormatter {
 
         let enumValue = schema.getEnum(name: name, description: "").flatMap { getEnumContext($0)["enumName"] as? String }
 
-        switch schema {
-        case let .string(_, format): return enumValue ?? getStringFormatType(format)
-        case let .number(_, format): return getNumberFormatType(format)
+        switch schema.type {
+        case let .string(format): return enumValue ?? getStringFormatType(format)
+        case let .number(format): return getNumberFormatType(format)
         case .integer: return "Int"
         case let .array(arraySchema):
             switch arraySchema.items {
@@ -128,17 +128,17 @@ public class SwiftFormatter: CodeFormatter {
             case let .many(types): return "[\(enumValue ?? getSchemaType(name: name, schema: types.first!))]"
             }
         case .boolean: return "Bool"
-        case let .enumeration(metadata): return metadata.title ?? "UKNOWN_ENUM"
+        case .enumeration: return schema.metadata.title ?? "UKNOWN_ENUM"
         case .file: return "URL"
         case let .object(schema):
             switch schema.additionalProperties {
             case let .a(bool): return "[String: Any]"
             case let .b(schema): return "[String: \(enumValue ?? getSchemaType(name: name, schema: schema))]"
             }
-        case let .structure(_, structure): return escapeType(structure.name.upperCamelCased())
+        case let .structure(structure): return escapeType(structure.name.upperCamelCased())
         case .allOf: return "UKNOWN_ALL_OFF"
         case .any: return "UKNOWN_ANY"
-        case .resolvingReference: fatalError()
+        case .unresolvedReference: fatalError()
         }
     }
 
@@ -152,7 +152,7 @@ public class SwiftFormatter: CodeFormatter {
         var encodedValue = getEncodedValue(name: getName(name), type: type)
 
         if case let .other(_, items) = parameter.parameter,
-            case let .array(item) = items {
+            case let .array(item) = items.type {
             if type != "[String]" {
                 encodedValue += ".map { String(describing: $0) }"
             }

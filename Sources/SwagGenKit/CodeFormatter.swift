@@ -125,7 +125,7 @@ public class CodeFormatter {
 
         var context: Context = [:]
 
-        if let operationId = operation.operation.operationId {
+        if let operationId = operation.operation.identifier {
             context["operationId"] = operationId
             context["filename"] = getFilename(operationId)
         } else {
@@ -141,7 +141,7 @@ public class CodeFormatter {
         context["method"] = operation.method.rawValue.uppercased()
         context["path"] = operation.path
         context["description"] = operation.operation.description
-        context["tag"] = operation.operation.tags?.first
+        context["tag"] = operation.operation.tags.first
         context["tags"] = operation.operation.tags
         context["params"] = operation.parameters.map(getParameterContext)
         context["hasBody"] = operation.parameters.contains { $0.parameter.fields.location == .body || $0.parameter.fields.location == .formData }

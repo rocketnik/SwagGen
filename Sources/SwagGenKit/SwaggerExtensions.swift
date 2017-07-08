@@ -142,7 +142,7 @@ extension Swagger {
     }
 
     public var tags: [String] {
-        let tags: [String] = operationFormatters.reduce([]) { $0 + ($1.operation.tags ?? []) }
+        let tags: [String] = operationFormatters.reduce([]) { $0 + ($1.operation.tags) }
         let distinctTags = Array(Set(tags))
         return distinctTags.sorted { $0.compare($1) == .orderedAscending }
     }
@@ -150,14 +150,14 @@ extension Swagger {
     var operationsByTag: [String: [OperationFormatter]] {
         var dictionary: [String: [OperationFormatter]] = [:]
 
-        let operationsWithoutTag = operationFormatters.filter { $0.operation.tags?.isEmpty ?? false }
+        let operationsWithoutTag = operationFormatters.filter { $0.operation.tags.isEmpty }
 
         if !operationsWithoutTag.isEmpty {
             dictionary[""] = operationsWithoutTag
         }
 
         for tag in tags {
-            dictionary[tag] = operationFormatters.filter { $0.operation.tags?.contains(tag) ?? false }
+            dictionary[tag] = operationFormatters.filter { $0.operation.tags.contains(tag) }
         }
 
         return dictionary
@@ -188,34 +188,10 @@ extension Structure {
 
 extension Schema {
 
-    var metadata: Metadata {
-        switch self {
-        case let .allOf(schema): return schema.metadata
-        case let .any(metadata): return metadata
-        case let .array(array): return array.metadata
-        case let .boolean(metadata): return metadata
-        case let .enumeration(metadata): return metadata
-        case let .file(metadata): return metadata
-        case let .integer(metadata, _): return metadata
-        case let .number(metadata, _): return metadata
-        case let .object(object): return object.metadata
-        case let .string(metadata, _): return metadata
-        case let .structure(metadata, _): return metadata
-        case .resolvingReference: fatalError()
-        }
-    }
-
-    var objectSchema: ObjectSchema? {
-        if case let .object(object) = self {
-            return object
-        }
-        return nil
-    }
-
     var parent: Structure<Schema>? {
-        if case let .allOf(object) = self {
+        if case let .allOf(object) = self.type {
             for schema in object.subschemas {
-                if case let .structure(_, schema) = schema {
+                if case let .structure(schema) = schema.type {
                     return schema
                 }
             }
@@ -228,11 +204,11 @@ extension Schema {
     }
 
     var requiredProperties: [PropertyFormatter] {
-        switch self {
+        switch self.type {
         case let .object(objectSchema): return objectSchema.requiredProperties
         case let .allOf(allOffSchema):
             for schema in allOffSchema.subschemas {
-                if case let .object(objectSchema) = schema {
+                if case let .object(objectSchema) = schema.type {
                     return objectSchema.requiredProperties
                 }
             }
@@ -242,11 +218,11 @@ extension Schema {
     }
 
     var optionalProperties: [PropertyFormatter] {
-        switch self {
+        switch self.type {
         case let .object(objectSchema): return objectSchema.optionalProperties
         case let .allOf(allOffSchema):
             for schema in allOffSchema.subschemas {
-                if case let .object(objectSchema) = schema {
+                if case let .object(objectSchema) = schema.type {
                     return objectSchema.optionalProperties
                 }
             }
@@ -268,12 +244,12 @@ extension Schema {
     }
 
     func getEnum(name: String, description: String?) -> Enum? {
-        switch self {
+        switch self.type {
         case let .object(objectSchema):
             if case let .b(schema) = objectSchema.additionalProperties {
                 return schema.getEnum(name: name, description: description)
             }
-        case let .string(metadata, _): return metadata.getEnum(name: name, description: description ?? metadata.description)
+        case .string: return metadata.getEnum(name: name, description: description ?? metadata.description)
             // TODO: support enums other than string
         case let .array(array):
             if case let .one(schema) = array.items {
@@ -352,7 +328,7 @@ extension Parameter {
     func getEnum(name: String, description: String?) -> Enum? {
 
         switch self {
-        case let .body(fields, schema): return schema.getEnum(name: name, description: description)
+        case let .body(_, schema): return schema.getEnum(name: name, description: description)
         case let .other(_, items): return items.getEnum(name: name, description: description)
         }
     }
@@ -360,27 +336,17 @@ extension Parameter {
 
 extension Items {
 
-    var metadata: Metadata {
-        switch self {
-        case let .array(item): return item.metadata
-        case let .boolean(item): return item
-        case let .integer(item): return item.metadata
-        case let .number(item): return item.metadata
-        case let .string(item): return item.metadata
-        }
-    }
-
     func getEnum(name: String, description: String?) -> Enum? {
 
-        switch self {
+        switch self.type {
         case let .array(array):
-            if case let .string(item) = array.items {
-                if let enumValue = item.metadata.getEnum(name: name, description: description) {
+            if case .string = array.items.type {
+                if let enumValue = array.items.metadata.getEnum(name: name, description: description) {
                     return enumValue
                 }
             }
-        case let .string(item):
-            return item.metadata.getEnum(name: name, description: description)
+        case .string:
+            return metadata.getEnum(name: name, description: description)
         default: break
         }
         return nil
